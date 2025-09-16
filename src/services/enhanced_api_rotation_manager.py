@@ -61,23 +61,24 @@ class EnhancedAPIRotationManager:
             'jina': [],
             'exa': [],
             'serper': [],
-            'serpapi': [],  # Nova API adicionada
+            'serpapi': [],
             'tavily': [],
             'supadata': [],
             'firecrawl': [],
             'scrapingant': [],
             'youtube': [],
-            'rapidapi': []  # Nova API adicionada
+            'rapidapi': [],
+            'apify': []  # Adicionado Apify
         }
         
         # Definir cadeias de fallback (cada grupo é uma prioridade)
         self.fallback_chains = {
             'ai_models': [['qwen'], ['gemini'], ['openai'], ['groq'], ['deepseek']],
-            'search': [['jina'], ['exa'], ['serper'], ['serpapi'], ['firecrawl'], ['tavily']],
-            'social_insights': [['supadata'], ['serper'], ['serpapi'], ['firecrawl'], ['tavily']],
-            'web_scraping': [['firecrawl'], ['scrapingant'], ['jina'], ['serper'], ['serpapi']],
-            'content_extraction': [['firecrawl'], ['jina'], ['scrapingant'], ['serper'], ['rapidapi']],
-            'url_analysis': [['firecrawl'], ['jina'], ['exa'], ['serper'], ['serpapi']]
+            'search': [['jina'], ['exa'], ['serper'], ['serpapi'], ['firecrawl'], ['tavily'], ['apify']],
+            'social_insights': [['supadata'], ['apify'], ['serper'], ['serpapi'], ['firecrawl'], ['tavily']],
+            'web_scraping': [['firecrawl'], ['apify'], ['scrapingant'], ['jina'], ['serper'], ['serpapi']],
+            'content_extraction': [['firecrawl'], ['jina'], ['apify'], ['scrapingant'], ['serper'], ['rapidapi']],
+            'url_analysis': [['firecrawl'], ['jina'], ['exa'], ['apify'], ['serper'], ['serpapi']]
         }
         self.current_api_index = {}
         self.lock = threading.Lock()
@@ -144,10 +145,13 @@ class EnhancedAPIRotationManager:
                     max_requests_per_minute=60
                 ))
             
-            # Jina AI - Primário para busca
+            # Jina AI - Primário para busca - TODAS as chaves do .env
             jina_keys = [
                 os.getenv('JINA_API_KEY'),
-                os.getenv('JINA_API_KEY_1')
+                os.getenv('JINA_API_KEY_1'),
+                os.getenv('JINA_API_KEY_2'),
+                os.getenv('JINA_API_KEY_3'),
+                os.getenv('JINA_API_KEY_4')
             ]
             
             for i, key in enumerate(jina_keys, 1):
@@ -176,10 +180,12 @@ class EnhancedAPIRotationManager:
                     ))
                     logger.info(f"✅ EXA API {i} carregada")
             
-            # Serper - Substituto secundário
+            # Serper - Substituto secundário - TODAS as chaves do .env
             serper_keys = [
                 os.getenv('SERPER_API_KEY'),
-                os.getenv('SERPER_API_KEY_1')
+                os.getenv('SERPER_API_KEY_1'),
+                os.getenv('SERPER_API_KEY_2'),
+                os.getenv('SERPER_API_KEY_3')
             ]
             
             for i, key in enumerate(serper_keys, 1):
@@ -250,10 +256,11 @@ class EnhancedAPIRotationManager:
                     max_requests_per_minute=100
                 ))
             
-            # Firecrawl
+            # Firecrawl - TODAS as chaves do .env
             firecrawl_keys = [
                 os.getenv('FIRECRAWL_API_KEY'),
-                os.getenv('FIRECRAWL_API_KEY_1')
+                os.getenv('FIRECRAWL_API_KEY_1'),
+                os.getenv('FIRECRAWL_API_KEY_2')
             ]
             
             for i, key in enumerate(firecrawl_keys, 1):
@@ -296,6 +303,24 @@ class EnhancedAPIRotationManager:
                     max_requests_per_minute=200
                 ))
                 logger.info("✅ RapidAPI carregada")
+            
+            # Apify - TODAS as chaves do .env
+            apify_keys = [
+                os.getenv('APIFY_API_KEY'),
+                os.getenv('APIFY_API_KEY_1'),
+                os.getenv('APIFY_API_KEY_2'),
+                os.getenv('APIFY_API_KEY_3')
+            ]
+            
+            for i, key in enumerate(apify_keys, 1):
+                if key and key.strip():
+                    self.apis.setdefault('apify', []).append(APIEndpoint(
+                        name=f"apify_{i}",
+                        api_key=key,
+                        base_url="https://api.apify.com/v2",
+                        max_requests_per_minute=100
+                    ))
+                    logger.info(f"✅ Apify API {i} carregada")
             
             # Inicializar índices
             for service in self.apis:

@@ -769,12 +769,7 @@
 
         <!-- Action Buttons -->
         <div class="btn-group">
-            <button class="btn btn-primary" id="startCompleteWorkflowBtn" onclick="startCompleteWorkflow()">
-                <i class="fas fa-play"></i>
-                <span>Executar Workflow Completo</span>
-                <div class="loading-spinner" style="display: none;"></div>
-            </button>
-            
+
             <button class="btn btn-secondary" onclick="resetWorkflow()">
                 <i class="fas fa-refresh"></i>
                 <span>Resetar</span>
@@ -938,55 +933,7 @@
             }
         }
         
-        async function startCompleteWorkflow() {
-            try {
-                if (!validateForm()) {
-                    showNotification('Por favor, preencha pelo menos o segmento', 'warning');
-                    return;
-                }
-                
-                const formData = getFormData();
-                
-                showProgress(true);
-                updateProgress(0, 'Iniciando workflow completo...', 5);
-                
-                // Desabilita botão
-                const btn = document.getElementById('startCompleteWorkflowBtn');
-                btn.disabled = true;
-                btn.querySelector('.loading-spinner').style.display = 'inline-block';
-                
-                const response = await fetch('/api/workflow/complete', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(formData)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    currentSessionId = result.session_id;
-                    showNotification('Workflow completo iniciado com sucesso!', 'success');
-                    
-                    // Monitora progresso completo
-                    monitorCompleteWorkflowProgress();
-                } else {
-                    throw new Error(result.error);
-                }
-                
-            } catch (error) {
-                console.error('Erro no workflow completo:', error);
-                showNotification(`Erro no workflow: ${error.message}`, 'error');
-                
-                // Reabilita botão
-                const btn = document.getElementById('startCompleteWorkflowBtn');
-                btn.disabled = false;
-                btn.querySelector('.loading-spinner').style.display = 'none';
-                
-                showProgress(false);
-            }
-        }
+        // Função startCompleteWorkflow removida - botão desabilitado
         
         async function monitorStep1Progress() {
             const checkProgress = async () => {
@@ -1074,60 +1021,7 @@
             checkProgress();
         }
         
-        async function monitorCompleteWorkflowProgress() {
-            const checkProgress = async () => {
-                try {
-                    const response = await fetch(`/api/workflow/status/${currentSessionId}`);
-                    const status = await response.json();
-                    
-                    // Atualiza progresso baseado nas etapas
-                    let progress = 0;
-                    let currentStepText = 'Iniciando...';
-                    
-                    if (status.step_status?.step1 === 'completed') {
-                        progress = 33;
-                        currentStepText = 'Etapa 1 concluída - Dados coletados';
-                        updateStepCard('step1Card', 'completed');
-                        updateStepIndicator(1, 'completed');
-                    }
-                    
-                    if (status.step_status?.step2 === 'completed') {
-                        progress = 66;
-                        currentStepText = 'Etapa 2 concluída - Síntese realizada';
-                        updateStepCard('step2Card', 'completed');
-                        updateStepIndicator(2, 'completed');
-                    }
-                    
-                    if (status.step_status?.step3 === 'completed') {
-                        progress = 100;
-                        currentStepText = 'Workflow concluído - 16 módulos gerados';
-                        updateStepCard('step3Card', 'completed');
-                        updateStepIndicator(3, 'completed');
-                        
-                        showNotification('Workflow completo concluído com sucesso!', 'success');
-                        showResults();
-                        
-                        // Reabilita botão
-                        const btn = document.getElementById('startCompleteWorkflowBtn');
-                        btn.disabled = false;
-                        btn.querySelector('.loading-spinner').style.display = 'none';
-                        
-                        return;
-                    }
-                    
-                    updateProgress(status.current_step || 0, currentStepText, progress);
-                    
-                    // Continua monitorando
-                    setTimeout(checkProgress, 3000);
-                    
-                } catch (error) {
-                    console.error('Erro no monitoramento completo:', error);
-                    setTimeout(checkProgress, 5000);
-                }
-            };
-            
-            checkProgress();
-        }
+        // Função monitorCompleteWorkflowProgress removida - botão desabilitado
         
         function updateProgress(step, message, percentage) {
             document.getElementById('progressTitle').innerHTML = `<i class="fas fa-cogs fa-spin"></i> ${message}`;
@@ -1372,7 +1266,7 @@
                 // Reset buttons
                 document.getElementById('step2Btn').disabled = true;
                 document.getElementById('step3Btn').disabled = true;
-                document.getElementById('startCompleteWorkflowBtn').disabled = false;
+                // startCompleteWorkflowBtn removido
                 
                 showNotification('Workflow resetado', 'info');
             }

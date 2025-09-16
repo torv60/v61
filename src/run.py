@@ -81,7 +81,7 @@ def create_app():
     from routes.progress import progress_bp
     from routes.user import user_bp
     from routes.monitoring import monitoring_bp
-    from routes.pdf_generator import pdf_bp
+    # from routes.pdf_generator import pdf_bp  # REMOVIDO - não existe
     from routes.html_report_generator import html_report_bp
     from routes.mcp import mcp_bp
     from routes.enhanced_workflow import enhanced_workflow_bp
@@ -93,7 +93,7 @@ def create_app():
     app.register_blueprint(progress_bp, url_prefix='/api')
     app.register_blueprint(user_bp, url_prefix='/user')
     app.register_blueprint(monitoring_bp, url_prefix='/monitoring')
-    app.register_blueprint(pdf_bp, url_prefix='/pdf')
+    # app.register_blueprint(pdf_bp, url_prefix='/pdf')  # REMOVIDO - não existe
     app.register_blueprint(html_report_bp, url_prefix='/html_report')
     app.register_blueprint(mcp_bp, url_prefix='/mcp')
     app.register_blueprint(enhanced_workflow_bp, url_prefix='/api')

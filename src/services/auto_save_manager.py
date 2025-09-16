@@ -8,11 +8,27 @@ Sistema de salvamento automático ultra-robusto
 import os
 import json
 import logging
+import asyncio
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# Import do serviço preditivo (lazy loading para evitar circular imports)
+_predictive_service = None
+
+def get_predictive_service():
+    """Lazy loading do serviço preditivo"""
+    global _predictive_service
+    if _predictive_service is None:
+        try:
+            from services.predictive_analytics_service import predictive_analytics_service
+            _predictive_service = predictive_analytics_service
+        except ImportError as e:
+            logger.warning(f"⚠️ Serviço preditivo não disponível: {e}")
+            _predictive_service = None
+    return _predictive_service
 
 def serializar_dados_seguros(dados: Any) -> Dict[str, Any]:
     """
@@ -50,9 +66,10 @@ class AutoSaveManager:
             self.base_path,
             self.analyses_path,
             f"{self.base_path}/analise_completa",
-            f"{self.base_path}/pesquisa_web",
+            f"{self.base_path}/pesquisa_web", # Para logs do WebSailor
             f"{self.base_path}/logs",
             f"{self.base_path}/erros",
+            f"{self.base_path}/workflow", # Para etapas do workflow
             f"{self.analyses_path}/analyses",
             f"{self.analyses_path}/anti_objecao",
             f"{self.analyses_path}/avatars",
@@ -66,7 +83,7 @@ class AutoSaveManager:
             f"{self.analyses_path}/metadata",
             f"{self.analyses_path}/metricas",
             f"{self.analyses_path}/palavras_chave",
-            f"{self.analyses_path}/pesquisa_web",
+            f"{self.analyses_path}/pesquisa_web", # *** NOVO: Diretório principal para trechos de texto ***
             f"{self.analyses_path}/plano_acao",
             f"{self.analyses_path}/posicionamento",
             f"{self.analyses_path}/pre_pitch",
@@ -122,6 +139,9 @@ class AutoSaveManager:
 
                 logger.info(f"💾 Etapa '{nome_etapa}' salva: {arquivo_json}")
 
+                # INTEGRAÇÃO COM ANÁLISE PREDITIVA
+                self._trigger_predictive_analysis(nome_etapa, dados_serializaveis, categoria, session_id)
+
                 # TAMBÉM salva na pasta analyses_data se for um módulo
                 # Lista de categorias que devem ser salvas em analyses_data
                 modulos_para_analyses_data = [
@@ -153,7 +173,8 @@ class AutoSaveManager:
 
                 return arquivo_json
 
-            except Exception:
+            except Exception as json_error:
+                logger.warning(f"⚠️ Falha ao salvar como JSON ({json_error}), tentando salvar como texto...")
                 # Fallback para texto se falhar ao salvar como JSON
                 arquivo_txt = f"{diretorio}/{nome_arquivo}.txt"
                 with open(arquivo_txt, 'w', encoding='utf-8') as f:
@@ -167,6 +188,61 @@ class AutoSaveManager:
 
         except Exception as e:
             logger.error(f"❌ Erro ao salvar etapa {nome_etapa}: {e}")
+            return ""
+
+    # === NOVA FUNÇÃO: salvar_trecho_pesquisa_web ===
+    def salvar_trecho_pesquisa_web(self, url: str, titulo: str, conteudo: str, metodo_extracao: str, qualidade: float, session_id: str) -> str:
+        """
+        Salva um trecho de texto extraído de uma pesquisa web.
+
+        Args:
+            url (str): A URL da página de origem.
+            titulo (str): O título da página.
+            conteudo (str): O conteúdo textual extraído.
+            metodo_extracao (str): O método usado para extrair (e.g., 'jina', 'exa', 'readability').
+            qualidade (float): Um score de qualidade do conteúdo (0-100).
+            session_id (str): O ID da sessão de análise.
+
+        Returns:
+            str: O caminho do arquivo salvo, ou string vazia em caso de erro.
+        """
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+            
+            # Diretório específico para trechos de pesquisa web
+            diretorio = f"{self.analyses_path}/pesquisa_web/{session_id}"
+            os.makedirs(diretorio, exist_ok=True)
+
+            # Nome do arquivo baseado na URL e timestamp para unicidade
+            # Sanitiza a URL para nome de arquivo
+            nome_arquivo_seguro = "".join(c for c in url if c.isalnum() or c in (' ', '.', '_', '-')).rstrip()
+            # Limita o tamanho do nome do arquivo
+            nome_arquivo_seguro = nome_arquivo_seguro[:100] if len(nome_arquivo_seguro) > 100 else nome_arquivo_seguro
+            # Substitui espaços por underscores
+            nome_arquivo_seguro = nome_arquivo_seguro.replace(" ", "_")
+            
+            nome_arquivo = f"trecho_{nome_arquivo_seguro}_{timestamp}.json"
+            arquivo_completo = os.path.join(diretorio, nome_arquivo)
+
+            # Dados a serem salvos
+            dados_trecho = {
+                "url": url,
+                "titulo": titulo,
+                "conteudo": conteudo,
+                "metodo_extracao": metodo_extracao,
+                "qualidade": qualidade,
+                "timestamp_extracao": timestamp,
+                "session_id": session_id
+            }
+
+            with open(arquivo_completo, 'w', encoding='utf-8') as f:
+                json.dump(dados_trecho, f, ensure_ascii=False, indent=2)
+
+            logger.info(f"🔍 Trecho de pesquisa web salvo: {arquivo_completo} (Qualidade: {qualidade:.1f})")
+            return arquivo_completo
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao salvar trecho de pesquisa web para {url}: {e}")
             return ""
 
     def salvar_erro(self, nome_erro: str, erro: Exception, contexto: Dict[str, Any] = None, session_id: str = None) -> str:
@@ -248,6 +324,61 @@ class AutoSaveManager:
             logger.error(f"❌ Erro ao salvar módulo {nome_modulo} em analyses_data: {e}")
             return ""
 
+    def salvar_json_gigante(self, dados: Dict[str, Any], session_id: str) -> str:
+        """Salva JSON gigante com dados massivos"""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"dados_massivos_{session_id}_{timestamp}.json"
+            filepath = os.path.join(self.base_path, "completas", filename)
+            
+            # Garante que o diretório existe
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            
+            # Salva JSON com formatação
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(dados, f, ensure_ascii=False, indent=2)
+            
+            # Calcula estatísticas
+            file_size = os.path.getsize(filepath)
+            content_length = len(json.dumps(dados, ensure_ascii=False))
+            
+            logger.info(f"💾 JSON gigante salvo: {filepath}")
+            logger.info(f"📊 Tamanho: {file_size:,} bytes ({content_length:,} caracteres)")
+            
+            return filepath
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao salvar JSON gigante: {e}")
+            raise
+
+    def recuperar_etapa(self, nome_etapa: str, session_id: str = None) -> Dict[str, Any]:
+        """Recupera dados de uma etapa salva"""
+        try:
+            if session_id:
+                diretorio = f"{self.base_path}/{session_id}"
+            else:
+                diretorio = self.base_path
+            
+            # Procura arquivo da etapa
+            import glob
+            pattern = f"{diretorio}/*{nome_etapa}*.json"
+            arquivos = glob.glob(pattern)
+            
+            if not arquivos:
+                return {"status": "nao_encontrado", "dados": {}}
+            
+            # Pega o arquivo mais recente
+            arquivo_mais_recente = max(arquivos, key=os.path.getctime)
+            
+            with open(arquivo_mais_recente, 'r', encoding='utf-8') as f:
+                dados = json.load(f)
+            
+            return {"status": "sucesso", "dados": dados, "arquivo": arquivo_mais_recente}
+            
+        except Exception as e:
+            logger.error(f"❌ Erro ao recuperar etapa {nome_etapa}: {e}")
+            return {"status": "erro", "erro": str(e), "dados": {}}
+
     def listar_etapas_salvas(self, session_id: str = None) -> Dict[str, str]:
         """Lista todas as etapas salvas"""
         etapas = {}
@@ -321,13 +452,18 @@ class AutoSaveManager:
             diretorio = f"{self.analyses_path}/reports"
             os.makedirs(diretorio, exist_ok=True)
 
-            arquivo = f"{diretorio}/relatorio_final_{session_id}_{timestamp}.txt"
-
-            with open(arquivo, 'w', encoding='utf-8') as f:
+            # Salva também como .md para facilitar visualização
+            arquivo_md = f"{diretorio}/relatorio_final_{session_id}_{timestamp}.md"
+            with open(arquivo_md, 'w', encoding='utf-8') as f:
+                f.write(relatorio)
+            
+            # Salva como .txt também, mantendo compatibilidade
+            arquivo_txt = f"{diretorio}/relatorio_final_{session_id}_{timestamp}.txt"
+            with open(arquivo_txt, 'w', encoding='utf-8') as f:
                 f.write(relatorio)
 
-            logger.info(f"📄 Relatório final salvo: {arquivo}")
-            return arquivo
+            logger.info(f"📄 Relatório final salvo: {arquivo_md}")
+            return arquivo_md
 
         except Exception as e:
             logger.error(f"❌ Erro ao salvar relatório final: {e}")
@@ -445,6 +581,93 @@ class AutoSaveManager:
                 logger.warning(f"⚠️ Detectado problema 'unhashable type', aplicando correção...")
             return self._clean_for_serialization(data)
 
+    def _trigger_predictive_analysis(self, nome_etapa: str, dados: Dict[str, Any], categoria: str, session_id: str):
+        """
+        Aciona análises preditivas automaticamente após salvar dados-chave.
+        Implementa as especificações dos aprimoramentos.
+        """
+        if not session_id:
+            return
+        
+        try:
+            predictive_service = get_predictive_service()
+            if not predictive_service:
+                return
+            
+            # Condição 1: Após salvar dados da categoria 'pesquisa_web'
+            if categoria == "pesquisa_web" or "websailor" in nome_etapa.lower():
+                try:
+                    # Extrai conteúdo para análise
+                    content = ""
+                    if isinstance(dados, dict):
+                        if "data" in dados:
+                            content = str(dados["data"])
+                        elif "content" in dados:
+                            content = str(dados["content"])
+                        else:
+                            content = str(dados)
+                    else:
+                        content = str(dados)
+                    
+                    # Calcula score de qualidade
+                    qualidade_score = predictive_service.get_content_quality_score(content)
+                    
+                    # Salva o score
+                    self.salvar_etapa(
+                        f"{nome_etapa}_qualidade", 
+                        {"score": qualidade_score, "content_length": len(content)}, 
+                        "analise_qualidade", 
+                        session_id
+                    )
+                    
+                    logger.info(f"🔮 Score de qualidade calculado para {nome_etapa}: {qualidade_score:.1f}")
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro ao calcular qualidade para {nome_etapa}: {e}")
+            
+            # Condição 2: Após salvar dados da categoria 'conteudo_sintetizado'
+            elif categoria == "conteudo_sintetizado" or "sintese" in nome_etapa.lower():
+                try:
+                    # Extrai conteúdo principal
+                    conteudo_principal = ""
+                    if isinstance(dados, dict):
+                        if "data" in dados and isinstance(dados["data"], dict):
+                            conteudo_principal = dados["data"].get("conteudo_principal", "")
+                        elif "conteudo_principal" in dados:
+                            conteudo_principal = dados["conteudo_principal"]
+                        else:
+                            conteudo_principal = str(dados)
+                    else:
+                        conteudo_principal = str(dados)
+                    
+                    if conteudo_principal:
+                        # Executa análise de chunk de forma assíncrona
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            insights_parciais = loop.run_until_complete(
+                                predictive_service.analyze_content_chunk(conteudo_principal)
+                            )
+                            
+                            # Salva insights parciais
+                            self.salvar_etapa(
+                                f"{nome_etapa}_insights_parciais", 
+                                insights_parciais, 
+                                "insights_parciais", 
+                                session_id
+                            )
+                            
+                            logger.info(f"🔮 Insights parciais gerados para {nome_etapa}")
+                            
+                        finally:
+                            loop.close()
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ Erro ao gerar insights parciais para {nome_etapa}: {e}")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Erro na integração preditiva para {nome_etapa}: {e}")
+
 # Instância global
 auto_save_manager = AutoSaveManager()
 
@@ -453,6 +676,11 @@ def salvar_etapa(nome_etapa: str, dados: Any, categoria: str = "analise_completa
     """Função de conveniência para salvar etapa"""
     # A lógica de salvar em analyses_data já está dentro do método salvar_etapa
     return auto_save_manager.salvar_etapa(nome_etapa, dados, categoria, session_id)
+
+# === NOVA FUNÇÃO DE CONVENIÊNCIA ===
+def salvar_trecho_pesquisa_web(url: str, titulo: str, conteudo: str, metodo_extracao: str, qualidade: float, session_id: str) -> str:
+    """Função de conveniência para salvar trecho de pesquisa web."""
+    return auto_save_manager.salvar_trecho_pesquisa_web(url, titulo, conteudo, metodo_extracao, qualidade, session_id)
 
 def salvar_erro(nome_erro: str, erro: Exception, contexto: Dict[str, Any] = None, session_id: str = None) -> str:
     """Função de conveniência para salvar erro"""

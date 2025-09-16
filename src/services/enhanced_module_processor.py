@@ -16,8 +16,15 @@ from pathlib import Path
 # Import do Enhanced AI Manager
 from services.enhanced_ai_manager import enhanced_ai_manager
 from services.auto_save_manager import salvar_etapa, salvar_erro
-# CORREÇÃO 1: Importar a função com o nome correto
-from modules.cpl_creator import create_devastating_cpl_protocol # Import do novo módulo
+# CORREÇÃO 1: Importar os módulos implementados
+try:
+    from services.cpl_devastador_protocol import CPLDevastadorProtocol
+    from services.avatar_generation_system import AvatarGenerationSystem
+    from services.visceral_leads_engineer import VisceralLeadsEngineer
+    HAS_ENHANCED_MODULES = True
+except ImportError as e:
+    logger.warning(f"Módulos aprimorados não encontrados: {e}")
+    HAS_ENHANCED_MODULES = False
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +139,37 @@ class EnhancedModuleProcessor:
                 'use_active_search': True,
                 'type': 'specialized',
                 'requires': ['sintese_master', 'avatar_data', 'contexto_estrategico', 'dados_web']
+            },
+            # Módulos adicionais para completar os 26 módulos
+            'analise_sentimento': {
+                'title': 'Análise de Sentimento Detalhada',
+                'description': 'Análise profunda do sentimento do mercado',
+                'use_active_search': True,
+                'type': 'standard'
+            },
+            'mapeamento_tendencias': {
+                'title': 'Mapeamento de Tendências',
+                'description': 'Identificação e análise de tendências emergentes',
+                'use_active_search': True,
+                'type': 'standard'
+            },
+            'oportunidades_mercado': {
+                'title': 'Oportunidades de Mercado',
+                'description': 'Identificação de oportunidades não exploradas',
+                'use_active_search': True,
+                'type': 'standard'
+            },
+            'riscos_ameacas': {
+                'title': 'Avaliação de Riscos e Ameaças',
+                'description': 'Análise de riscos e ameaças do mercado',
+                'use_active_search': True,
+                'type': 'standard'
+            },
+            'conteudo_viral': {
+                'title': 'Análise de Conteúdo Viral',
+                'description': 'Fatores de sucesso em conteúdo viral',
+                'use_active_search': False,
+                'type': 'standard'
             }
         }
 
@@ -506,6 +544,57 @@ Este relatório consolida {results['successful_modules']} módulos especializado
         except Exception as e:
             logger.error(f"❌ Erro ao gerar relatório consolidado: {e}")
             salvar_erro("relatorio_consolidado", e, contexto={"session_id": session_id})
+
+# Função para integração com o protocolo CPL devastador
+async def create_devastating_cpl_protocol(sintese_master: Dict[str, Any], 
+                                        avatar_data: Dict[str, Any], 
+                                        contexto_estrategico: Dict[str, Any], 
+                                        dados_web: Dict[str, Any], 
+                                        session_id: str) -> Dict[str, Any]:
+    """
+    Cria protocolo de CPLs devastadores usando os módulos implementados
+    """
+    try:
+        if not HAS_ENHANCED_MODULES:
+            logger.warning("⚠️ Módulos aprimorados não disponíveis, usando fallback")
+            return {
+                'titulo': 'Protocolo de CPLs Devastadores',
+                'descricao': 'Módulos aprimorados não disponíveis - Execute a primeira etapa primeiro',
+                'status': 'fallback',
+                'fases': {},
+                'error': 'Módulos não encontrados'
+            }
+        
+        logger.info("🚀 Iniciando criação de protocolo CPL devastador")
+        
+        # Inicializa o protocolo CPL
+        cpl_protocol = CPLDevastadorProtocol()
+        
+        # Extrai dados do contexto
+        tema = contexto_estrategico.get('tema', 'Produto/Serviço')
+        segmento = contexto_estrategico.get('segmento', 'Mercado')
+        publico_alvo = contexto_estrategico.get('publico_alvo', 'Público-alvo')
+        
+        # Executa protocolo completo
+        resultado_cpl = await cpl_protocol.executar_protocolo_completo(
+            tema=tema,
+            segmento=segmento, 
+            publico_alvo=publico_alvo,
+            session_id=session_id
+        )
+        
+        logger.info("✅ Protocolo CPL devastador criado com sucesso")
+        return resultado_cpl
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar protocolo CPL: {e}")
+        return {
+            'titulo': 'Protocolo de CPLs Devastadores',
+            'descricao': f'Erro na criação: {str(e)}',
+            'status': 'error',
+            'fases': {},
+            'error': str(e)
+        }
 
 # Instância global
 enhanced_module_processor = EnhancedModuleProcessor()

@@ -42,7 +42,14 @@ class ComprehensiveReportGeneratorV3:
             'cpl_protocol_2',
             'cpl_protocol_3',
             'cpl_protocol_4',
-            'cpl_protocol_5'
+            'cpl_protocol_5',
+            # Módulos adicionais para completar os 26 módulos
+            'cpl_completo',
+            'analise_sentimento',
+            'mapeamento_tendencias',
+            'oportunidades_mercado',
+            'riscos_ameacas',
+            'conteudo_viral'
         ]
 
         # Títulos atualizados, incluindo os novos módulos de CPL
@@ -68,7 +75,14 @@ class ComprehensiveReportGeneratorV3:
             'cpl_protocol_2': 'CPL1 - A Oportunidade Paralisante',
             'cpl_protocol_3': 'CPL2 - A Transformação Impossível',
             'cpl_protocol_4': 'CPL3 - O Caminho Revolucionário',
-            'cpl_protocol_5': 'CPL4 - A Decisão Inevitável'
+            'cpl_protocol_5': 'CPL4 - A Decisão Inevitável',
+            # Títulos dos módulos adicionais para completar os 26 módulos
+            'cpl_completo': 'Protocolo Integrado de CPLs Devastadores',
+            'analise_sentimento': 'Análise de Sentimento Detalhada',
+            'mapeamento_tendencias': 'Mapeamento de Tendências e Previsões',
+            'oportunidades_mercado': 'Identificação de Oportunidades de Mercado',
+            'riscos_ameacas': 'Avaliação de Riscos e Ameaças',
+            'conteudo_viral': 'Análise de Conteúdo Viral e Fatores de Sucesso'
         }
 
         logger.info("📋 Comprehensive Report Generator ULTRA ROBUSTO inicializado")
@@ -137,6 +151,42 @@ class ComprehensiveReportGeneratorV3:
                 "session_id": session_id,
                 "timestamp": datetime.now().isoformat()
             }
+
+    def get_final_report_content(self, session_id: str) -> str:
+        """
+        Retorna apenas o conteúdo do relatório final como string
+        
+        Args:
+            session_id: ID da sessão
+            
+        Returns:
+            String com o conteúdo do relatório final
+        """
+        try:
+            # 1. Verifica estrutura de diretórios
+            session_dir = Path(f"analyses_data/{session_id}")
+            modules_dir = session_dir / "modules"
+            files_dir = Path(f"analyses_data/files/{session_id}")
+
+            if not session_dir.exists():
+                return f"# ERRO\n\nDiretório da sessão não encontrado: {session_dir}"
+
+            # 2. Carrega módulos disponíveis
+            available_modules = self._load_available_modules(modules_dir)
+
+            # 3. Carrega screenshots disponíveis
+            screenshot_paths = self._load_screenshot_paths(files_dir)
+
+            # 4. Compila e retorna apenas o conteúdo
+            return self._compile_report_content(
+                session_id, 
+                available_modules, 
+                screenshot_paths
+            )
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao obter conteúdo do relatório: {e}")
+            return f"# ERRO\n\nErro ao gerar relatório: {str(e)}"
 
     def _load_available_modules(self, modules_dir: Path) -> Dict[str, str]:
         """Carrega módulos disponíveis"""

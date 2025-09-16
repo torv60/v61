@@ -12,7 +12,7 @@ import asyncio
 from typing import Dict, List, Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from services.exa_client import exa_client
-from services.production_search_manager import production_search_manager
+# from services.production_search_manager import production_search_manager
 from services.auto_save_manager import salvar_etapa, salvar_erro
 
 logger = logging.getLogger(__name__)

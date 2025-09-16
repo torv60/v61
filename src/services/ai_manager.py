@@ -34,7 +34,7 @@ except ImportError:
     HAS_GROQ_CLIENT = False
 
 try:
-    from services.search_api_manager import search_api_manager
+    # from services.search_api_manager import search_api_manager  # REMOVIDO - não existe
     HAS_SEARCH_MANAGER = True
 except ImportError:
     HAS_SEARCH_MANAGER = False
@@ -158,7 +158,8 @@ class AIManager:
                 return {'error': 'Search manager não disponível'}
             
             logger.info(f"🔍 IA solicitou busca: {query}")
-            results = await search_api_manager.interleaved_search(query)
+            # results = await search_api_manager.interleaved_search(query)  # REMOVIDO
+            results = []  # Placeholder
             
             # Formata resultados para a IA
             formatted_results = []

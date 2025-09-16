@@ -902,8 +902,13 @@ class PredictiveAnalyticsEngine:
             self.topic_model = lda_model # Armazena o modelo treinado
 
             topics = []
+            
             for idx, topic in lda_model.print_topics(-1):
-    
+                topics.append({
+                    "topic_id": idx,
+                    "words": topic,
+                    "weight": 1.0 / (idx + 1)  # Peso decrescente
+                })
  
             return topics
         except Exception as e:
@@ -921,7 +926,7 @@ class PredictiveAnalyticsEngine:
             X = self.tfidf_vectorizer.fit_transform(texts)
 
             # Aplica KMeans
-            kmeans_model = KMeans(n_clusters=self.config["n_clusters_kmeans"], init=\'k-means++\', max_iter=300, random_state=42, n_init=10)
+            kmeans_model = KMeans(n_clusters=self.config["n_clusters_kmeans"], init='k-means++', max_iter=300, random_state=42, n_init=10)
             kmeans_model.fit(X)
             
             clusters = defaultdict(list)
@@ -939,32 +944,6 @@ class PredictiveAnalyticsEngine:
             return {"clusters": {k: v for k, v in clusters.items()}, "cluster_keywords": cluster_keywords}
         except Exception as e:
             logger.error(f"❌ Erro no clustering semântico: {e}")
-            return {}
-               self.tfidf_vectorizer.fit(texts)
-
-            X = self.tfidf_vectorizer.transform(texts)
-            
-            num_clusters = min(self.config["n_clusters_kmeans"], len(texts))
-            if num_clusters == 0:
-                return {}
-
-            kmeans_model = KMeans(n_clusters=num_clusters, init="k-means++", max_iter=100, n_init=10, random_state=42)
-            kmeans_model.fit(X)
-            
-            clusters = defaultdict(list)
-            for i, label in enumerate(kmeans_model.labels_):
-                clusters[f"cluster_{label}"].append(texts[i])
-            
-            # Opcional: extrair palavras-chave para cada cluster
-            cluster_keywords = {}
-            order_centroids = kmeans_model.cluster_centers_.argsort()[:, ::-1]
-            terms = self.tfidf_vectorizer.get_feature_names_out()
-            for i in range(num_clusters):
-                cluster_keywords[f"cluster_{i}"] = [terms[ind] for ind in order_centroids[i, :10]]
-
-            return {"clusters": dict(clusters), "cluster_keywords": cluster_keywords}
-        except Exception as e:
-            logger.error(f"❌ Erro ao realizar clustering semântico: {e}")
             return {}
 
 

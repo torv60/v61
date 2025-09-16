@@ -54,7 +54,7 @@ class TavilyMCPClient:
             
         except Exception as e:
             logger.error(f"❌ Erro na busca social Tavily: {e}")
-            return self._generate_social_fallback(query, platforms)
+            raise Exception(f"Erro crítico na busca social Tavily: {e} - Não há fallback simulado")
     
     def search_youtube_content(self, query: str, content_type: str = 'videos') -> Dict[str, Any]:
         """Busca conteúdo específico do YouTube"""
@@ -125,7 +125,7 @@ class TavilyMCPClient:
         """Executa busca via API Tavily"""
         
         if not self.api_key:
-            return self._generate_mock_results(query, context)
+            raise Exception("TAVILY_API_KEY é obrigatória - não há dados simulados")
         
         try:
             headers = {
@@ -150,11 +150,11 @@ class TavilyMCPClient:
                     return response.json()
                 else:
                     logger.error(f"❌ Tavily API erro {response.status_code}: {response.text}")
-                    return self._generate_mock_results(query, context)
+                    raise Exception(f"Erro na API Tavily: {e} - Não há dados simulados")
                     
         except Exception as e:
             logger.error(f"❌ Erro na execução Tavily: {e}")
-            return self._generate_mock_results(query, context)
+            raise Exception(f"Erro crítico na execução Tavily: {e} - Não há dados simulados")
     
     def _get_platform_domain(self, platform: str) -> str:
         """Retorna domínio da plataforma"""
@@ -281,65 +281,10 @@ class TavilyMCPClient:
         # Implementação básica
         return ['Influencer 1', 'Influencer 2', 'Influencer 3']
     
-    # Métodos de fallback para quando a API não está disponível
-    def _generate_mock_results(self, query: str, context: str) -> Dict[str, Any]:
-        """Gera resultados simulados para desenvolvimento"""
-        return {
-            'results': [
-                {
-                    'title': f'Resultado simulado para {query}',
-                    'url': f'https://example.com/{context}/1',
-                    'content': f'Conteúdo simulado relacionado a {query}',
-                    'score': 0.85
-                }
-            ],
-            'answer': f'Resposta simulada para {query}',
-            'query': query,
-            'source': 'tavily_mock'
-        }
+    # TODOS OS MÉTODOS DE DADOS SIMULADOS FORAM REMOVIDOS
+    # SISTEMA AGORA EXIGE DADOS REAIS OBRIGATORIAMENTE
     
-    def _generate_social_fallback(self, query: str, platforms: List[str]) -> Dict[str, Any]:
-        """Gera fallback para busca social"""
-        return {
-            'total_platforms': len(platforms),
-            'platforms_searched': platforms,
-            'results': {platform: self._generate_mock_results(query, platform) for platform in platforms},
-            'timestamp': datetime.now().isoformat(),
-            'source': 'tavily_fallback',
-            'note': 'Resultados simulados - Configure TAVILY_API_KEY para dados reais'
-        }
-    
-    def _generate_youtube_fallback(self, query: str, content_type: str) -> Dict[str, Any]:
-        """Gera fallback para YouTube"""
-        return {
-            'query': query,
-            'content_type': content_type,
-            'total_results': 5,
-            'results': [
-                {
-                    'title': f'Vídeo simulado sobre {query}',
-                    'url': 'https://youtube.com/watch?v=example',
-                    'description': f'Descrição simulada sobre {query}',
-                    'relevance_score': 0.8,
-                    'content_type': 'video'
-                }
-            ],
-            'source': 'tavily_youtube_fallback'
-        }
-    
-    def _generate_trends_fallback(self, topic: str, timeframe: str) -> Dict[str, Any]:
-        """Gera fallback para análise de tendências"""
-        return {
-            'topic': topic,
-            'timeframe': timeframe,
-            'trend_analysis': {
-                'total_mentions': 10,
-                'trend_strength': 7.5,
-                'common_terms': ['crescimento', 'negócios', 'empreendedorismo']
-            },
-            'sentiment_overview': {'overall': 'positive'},
-            'source': 'tavily_trends_fallback'
-        }
+    # TODOS OS MÉTODOS DE FALLBACK SIMULADO FORAM REMOVIDOS
     
     def is_available(self) -> bool:
         """Verifica se o cliente está disponível"""

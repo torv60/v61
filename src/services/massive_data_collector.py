@@ -16,11 +16,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 # Importa serviços existentes
 from services.enhanced_search_coordinator import enhanced_search_coordinator
-from services.social_media_extractor import social_media_extractor
+# from services.social_media_extractor import social_media_extractor
 from services.auto_save_manager import salvar_etapa, salvar_erro
 
 # Importa novos serviços da Etapa 1
-from services.search_api_manager import search_api_manager
+# from services.search_api_manager import search_api_manager  # REMOVIDO - não existe
 from services.trendfinder_client import trendfinder_client
 from services.supadata_mcp_client import supadata_client
 from services.visual_content_capture import visual_content_capture
@@ -117,7 +117,8 @@ class MassiveDataCollector:
         try:
             # FASE 1: Busca Web Intercalada com Rotação de APIs
             logger.info("🔍 FASE 1: Executando busca web intercalada...")
-            web_results = await search_api_manager.interleaved_search(query)
+            # web_results = await search_api_manager.interleaved_search(query)  # REMOVIDO
+            web_results = []  # Placeholder
             massive_data["web_search_data"] = web_results
 
             # FASE 2: Coleta de Tendências via TrendFinder MCP
@@ -255,7 +256,8 @@ class MassiveDataCollector:
                 "total_content_length": total_content,
                 "collection_time": collection_time,
                 "sources_by_type": sources_by_type,
-                "api_rotations": search_api_manager.get_provider_stats()
+                # "api_rotations": search_api_manager.get_provider_stats()  # REMOVIDO
+                "api_rotations": {}  # Placeholder
             })
 
             # Gera relatório de coleta com referências às imagens

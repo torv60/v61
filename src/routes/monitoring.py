@@ -5,7 +5,7 @@ ARQV30 Enhanced v2.0 - Monitoring Routes
 Endpoints para monitoramento do sistema de extração
 """
 from flask import Blueprint, jsonify, request
-from services.robust_content_extractor import robust_content_extractor
+# from services.robust_content_extractor import robust_content_extractor
 import logging
 from datetime import datetime # Import datetime
 
