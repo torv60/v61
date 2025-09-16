@@ -19,6 +19,9 @@ from services.viral_content_analyzer import viral_content_analyzer
 from services.enhanced_synthesis_engine import enhanced_synthesis_engine
 from services.enhanced_module_processor import enhanced_module_processor
 from services.comprehensive_report_generator_v3 import comprehensive_report_generator_v3
+from services.enhanced_search_coordinator import enhanced_search_coordinator
+from services.content_size_monitor import content_size_monitor
+from services.marketing_insights_extractor import marketing_insights_extractor
 from services.auto_save_manager import salvar_etapa
 
 logger = logging.getLogger(__name__)
@@ -348,25 +351,52 @@ def execute_complete_workflow():
                     }
 
                     # Executa busca massiva
+                    # NOVA IMPLEMENTAÇÃO: Busca focada em marketing
                     search_results = loop.run_until_complete(
-                        real_search_orchestrator.execute_massive_real_search(
-                            query=query,
+                        enhanced_search_coordinator.execute_marketing_focused_search(
+                            base_query=query,
                             context=context,
                             session_id=session_id
                         )
                     )
+                    
+                    # Monitora tamanho e qualidade
+                    monitoring_data = content_size_monitor.monitor_content_collection(
+                        search_results=search_results,
+                        session_id=session_id
+                    )
+                    
+                    # Expande busca se necessário para atingir 300KB
+                    if content_size_monitor.check_expansion_needed(monitoring_data):
+                        logger.info("📈 Expandindo busca para atingir meta de 300KB")
+                        search_results = loop.run_until_complete(
+                            enhanced_search_coordinator.ensure_minimum_content_size(
+                                search_results=search_results,
+                                session_id=session_id
+                            )
+                        )
+                        
+                        # Re-monitora após expansão
+                        monitoring_data = content_size_monitor.monitor_content_collection(
+                            search_results=search_results,
+                            session_id=session_id
+                        )
 
-                    # Analisa conteúdo viral
-                    viral_analysis = loop.run_until_complete(
-                        viral_content_analyzer.analyze_and_capture_viral_content(
+                    # Extrai insights de marketing
+                    marketing_insights = loop.run_until_complete(
+                        marketing_insights_extractor.extract_marketing_insights(
                             search_results=search_results,
                             session_id=session_id
                         )
                     )
+                    
+                    # Adiciona dados de monitoramento aos resultados
+                    search_results['monitoring_data'] = monitoring_data
+                    search_results['marketing_insights'] = marketing_insights
 
                     # Gera relatório de coleta
                     collection_report = _generate_collection_report(
-                        search_results, viral_analysis, session_id, context
+                        search_results, marketing_insights, session_id, context
                     )
                     _save_collection_report(collection_report, session_id)
 
@@ -374,7 +404,8 @@ def execute_complete_workflow():
                     logger.info("🧠 Executando Etapa 2: Síntese com IA")
 
                     synthesis_result = loop.run_until_complete(
-                        enhanced_synthesis_engine.execute_enhanced_synthesis(session_id)
+                        "marketing_insights": marketing_insights,
+                        "monitoring_data": monitoring_data,
                     )
 
                     # ETAPA 3: Geração de módulos
@@ -586,8 +617,8 @@ def download_workflow_file(session_id, file_type):
 
 # --- Funções auxiliares ---
 def _generate_collection_report(
-    search_results: Dict[str, Any], 
-    viral_analysis: Dict[str, Any], 
+    search_results: Dict[str, Any],
+    marketing_insights: Dict[str, Any],
     session_id: str, 
     context: Dict[str, Any]
 ) -> str:
@@ -602,24 +633,30 @@ def _generate_collection_report(
             # Se falhar, retorna 'N/A' ou o valor original como string
             return str(value) if value is not None else 'N/A'
 
-    report = f"""# RELATÓRIO DE COLETA MASSIVA - ARQV30 Enhanced v3.0
+    report = f"""# RELATÓRIO DE COLETA FOCADA EM MARKETING - ARQV30 Enhanced v3.0
 
 **Sessão:** {session_id}  
 **Query:** {search_results.get('query', 'N/A')}  
-**Iniciado em:** {search_results.get('search_started', 'N/A')}  
+**Iniciado em:** {search_results.get('search_started', 'N/A')}
 **Duração:** {search_results.get('statistics', {}).get('search_duration', 0):.2f} segundos
 
 ---
 
-## RESUMO DA COLETA MASSIVA
+## RESUMO DA COLETA FOCADA EM MARKETING
 
 ### Estatísticas Gerais:
 - **Total de Fontes:** {search_results.get('statistics', {}).get('total_sources', 0)}
-- **URLs Únicas:** {search_results.get('statistics', {}).get('unique_urls', 0)}
-- **Conteúdo Extraído:** {safe_format_int(search_results.get('statistics', {}).get('content_extracted', 0))} caracteres
+- **Tamanho do Conteúdo:** {search_results.get('statistics', {}).get('content_size_kb', 0):.1f}KB
+- **Meta de 300KB:** {'✅ ATINGIDA' if search_results.get('statistics', {}).get('target_achieved', False) else '❌ NÃO ATINGIDA'}
 - **Provedores Utilizados:** {len(search_results.get('providers_used', []))}
-- **Conteúdo Viral Identificado:** {len(viral_analysis.get('viral_content_identified', []))}
-- **Screenshots Capturados:** {len(viral_analysis.get('screenshots_captured', []))}
+- **Marketing Insights:** {marketing_insights.get('statistics', {}).get('total_insights', 0)}
+- **Insights de Alto Valor:** {marketing_insights.get('statistics', {}).get('high_value_count', 0)}
+- **Screenshots Capturados:** {len(search_results.get('screenshots_captured', []))}
+
+### Qualidade do Conteúdo:
+- **Score de Qualidade:** {search_results.get('monitoring_data', {}).get('quality_score', 0):.2f}/10
+- **Diversidade:** {search_results.get('monitoring_data', {}).get('quality_metrics', {}).get('content_diversity', 0):.1f}/10
+- **Relevância Marketing:** {search_results.get('monitoring_data', {}).get('quality_metrics', {}).get('marketing_relevance', 0):.1f}/10
 
 ### Provedores Utilizados:
 """
@@ -674,8 +711,29 @@ def _generate_collection_report(
     else:
         report += "---\n\n## RESULTADOS DE REDES SOCIAIS\n\nNenhum resultado de rede social encontrado.\n\n"
 
+    # Adiciona insights de marketing extraídos
+    if marketing_insights.get('statistics', {}).get('total_insights', 0) > 0:
+        report += "---\n\n## INSIGHTS DE MARKETING EXTRAÍDOS\n\n"
+        
+        stats = marketing_insights.get('statistics', {})
+        report += f"**Total de Insights:** {stats.get('total_insights', 0)}  \n"
+        report += f"**Alto Valor:** {stats.get('high_value_count', 0)}  \n"
+        report += f"**Cases de Conversão:** {stats.get('conversion_cases', 0)}  \n"
+        report += f"**Campanhas de Sucesso:** {stats.get('successful_campaigns', 0)}  \n"
+        report += f"**Insights de Audiência:** {stats.get('audience_insights', 0)}  \n"
+        report += f"**Estratégias de Concorrentes:** {stats.get('competitor_strategies', 0)}  \n"
+        report += f"**Insights de Precificação:** {stats.get('pricing_insights', 0)}  \n\n"
+        
+        # Adiciona top insights de alto valor
+        high_value_insights = [i for i in marketing_insights.get('high_value_insights', []) if i.get('value_score', 0) >= 8]
+        if high_value_insights:
+            report += "### TOP 5 INSIGHTS DE ALTO VALOR:\n\n"
+            for i, insight in enumerate(high_value_insights[:5], 1):
+                report += f"**{i}.** {insight.get('insight_text', 'N/A')} (Score: {insight.get('value_score', 0):.1f}/10)  \n"
+                report += f"   *Fonte: {insight.get('platform', 'N/A')}*  \n\n"
+    
     # Adiciona screenshots capturados
-    screenshots = viral_analysis.get('screenshots_captured', [])
+    screenshots = search_results.get('screenshots_captured', [])
     if screenshots:
         report += "---\n\n## EVIDÊNCIAS VISUAIS CAPTURADAS\n\n"
         for i, screenshot in enumerate(screenshots, 1):
@@ -708,6 +766,16 @@ def _generate_collection_report(
     else:
         report += "---\n\n## EVIDÊNCIAS VISUAIS CAPTURADAS\n\nNenhum screenshot foi capturado.\n\n"
 
+    # Adiciona recomendações do monitor de qualidade
+    monitoring_data = search_results.get('monitoring_data', {})
+    recommendations = monitoring_data.get('recommendations', [])
+    
+    if recommendations:
+        report += "---\n\n## RECOMENDAÇÕES DE QUALIDADE\n\n"
+        for i, rec in enumerate(recommendations, 1):
+            report += f"{i}. {rec}\n"
+        report += "\n"
+    
     # Adiciona contexto da análise
     report += "---\n\n## CONTEXTO DA ANÁLISE\n\n"
     context_items_added = False
